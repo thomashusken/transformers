@@ -346,10 +346,12 @@ def main():
     else:
         data_files = {}
         if data_args.train_file is not None:
-            data_files["train"] = data_args.train_file
+            #data_files["train"] = data_args.train_file
+            data_files["train"] = "data/train.csv"
             extension = data_args.train_file.split(".")[-1]
         if data_args.validation_file is not None:
-            data_files["validation"] = data_args.validation_file
+            #data_files["validation"] = data_args.validation_file
+            data_files["validation"] = "data/test.csv"
             extension = data_args.validation_file.split(".")[-1]
         if data_args.test_file is not None:
             data_files["test"] = data_args.test_file
