@@ -42,7 +42,7 @@ from ...modeling_tf_utils import (
     keras_serializable,
     unpack_inputs,
 )
-from ...tf_utils import shape_list
+from ...tf_utils import shape_list, stable_softmax
 from ...utils import (
     MULTIPLE_CHOICE_DUMMY_INPUTS,
     add_code_sample_docstrings,
@@ -168,9 +168,8 @@ class TFConvBertSelfAttention(tf.keras.layers.Layer):
         self.num_attention_heads = num_attention_heads
         self.conv_kernel_size = config.conv_kernel_size
 
-        assert (
-            config.hidden_size % self.num_attention_heads == 0
-        ), "hidden_size should be divisible by num_attention_heads"
+        if config.hidden_size % self.num_attention_heads != 0:
+            raise ValueError("hidden_size should be divisible by num_attention_heads")
 
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.all_head_size = self.num_attention_heads * self.attention_head_size
@@ -229,7 +228,7 @@ class TFConvBertSelfAttention(tf.keras.layers.Layer):
 
         conv_kernel_layer = self.conv_kernel_layer(conv_attn_layer)
         conv_kernel_layer = tf.reshape(conv_kernel_layer, [-1, self.conv_kernel_size, 1])
-        conv_kernel_layer = tf.nn.softmax(conv_kernel_layer, axis=1)
+        conv_kernel_layer = stable_softmax(conv_kernel_layer, axis=1)
 
         paddings = tf.constant(
             [
@@ -271,7 +270,7 @@ class TFConvBertSelfAttention(tf.keras.layers.Layer):
             attention_scores = attention_scores + attention_mask
 
         # Normalize the attention scores to probabilities.
-        attention_probs = tf.nn.softmax(attention_scores, axis=-1)
+        attention_probs = stable_softmax(attention_scores, axis=-1)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
@@ -581,7 +580,6 @@ class TFConvBertMainLayer(tf.keras.layers.Layer):
         output_hidden_states=None,
         return_dict=None,
         training=False,
-        **kwargs,
     ):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -751,7 +749,6 @@ class TFConvBertModel(TFConvBertPreTrainedModel):
         output_hidden_states=None,
         return_dict=None,
         training=False,
-        **kwargs,
     ):
         outputs = self.convbert(
             input_ids=input_ids,
@@ -870,7 +867,6 @@ class TFConvBertForMaskedLM(TFConvBertPreTrainedModel, TFMaskedLanguageModelingL
         return_dict: Optional[bool] = None,
         labels: Optional[tf.Tensor] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ) -> Union[Tuple, TFMaskedLMOutput]:
         r"""
         labels (`tf.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -979,7 +975,6 @@ class TFConvBertForSequenceClassification(TFConvBertPreTrainedModel, TFSequenceC
         return_dict: Optional[bool] = None,
         labels: Optional[tf.Tensor] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ) -> Union[Tuple, TFSequenceClassifierOutput]:
         r"""
         labels (`tf.Tensor` of shape `(batch_size,)`, *optional*):
@@ -1073,7 +1068,6 @@ class TFConvBertForMultipleChoice(TFConvBertPreTrainedModel, TFMultipleChoiceLos
         return_dict: Optional[bool] = None,
         labels: Optional[tf.Tensor] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ) -> Union[Tuple, TFMultipleChoiceModelOutput]:
         r"""
         labels (`tf.Tensor` of shape `(batch_size,)`, *optional*):
@@ -1188,7 +1182,6 @@ class TFConvBertForTokenClassification(TFConvBertPreTrainedModel, TFTokenClassif
         return_dict: Optional[bool] = None,
         labels: Optional[tf.Tensor] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ) -> Union[Tuple, TFTokenClassifierOutput]:
         r"""
         labels (`tf.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -1268,7 +1261,6 @@ class TFConvBertForQuestionAnswering(TFConvBertPreTrainedModel, TFQuestionAnswer
         start_positions: Optional[tf.Tensor] = None,
         end_positions: Optional[tf.Tensor] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ) -> Union[Tuple, TFQuestionAnsweringModelOutput]:
         r"""
         start_positions (`tf.Tensor` of shape `(batch_size,)`, *optional*):

@@ -43,7 +43,7 @@ from ...modeling_tf_utils import (
     keras_serializable,
     unpack_inputs,
 )
-from ...tf_utils import shape_list
+from ...tf_utils import shape_list, stable_softmax
 from ...utils import logging
 from .configuration_gptj import GPTJConfig
 
@@ -191,7 +191,7 @@ class TFGPTJAttention(tf.keras.layers.Layer):
             # Apply the attention mask
             attn_weights = attn_weights + attention_mask
 
-        attn_weights = tf.nn.softmax(attn_weights, axis=-1)
+        attn_weights = stable_softmax(attn_weights, axis=-1)
         attn_weights = tf.cast(attn_weights, value.dtype)
         attn_weights = self.attn_dropout(attn_weights)
 
@@ -390,7 +390,6 @@ class TFGPTJMainLayer(tf.keras.layers.Layer):
         output_hidden_states=None,
         return_dict=None,
         training=False,
-        **kwargs,
     ):
 
         if input_ids is not None and inputs_embeds is not None:
@@ -672,7 +671,6 @@ class TFGPTJModel(TFGPTJPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ):
         r"""
         use_cache (`bool`, *optional*, defaults to `True`):
@@ -781,7 +779,6 @@ class TFGPTJForCausalLM(TFGPTJPreTrainedModel, TFCausalLanguageModelingLoss):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ):
         r"""
         labels (`np.ndarray` or `tf.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -886,7 +883,6 @@ class TFGPTJForSequenceClassification(TFGPTJPreTrainedModel, TFSequenceClassific
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ):
         r"""
         labels (`np.ndarray` or `tf.Tensor` of shape `(batch_size,)`, *optional*):
@@ -938,9 +934,8 @@ class TFGPTJForSequenceClassification(TFGPTJPreTrainedModel, TFSequenceClassific
         loss = None
 
         if labels is not None:
-            assert (
-                self.config.pad_token_id is not None or logits_shape[0] == 1
-            ), "Cannot handle batch sizes > 1 if no padding token is defined."
+            if self.config.pad_token_id is None and logits_shape[0] != 1:
+                raise ValueError("Cannot handle batch sizes > 1 if no padding token is defined.")
 
             if not tf.is_tensor(sequence_lengths):
                 in_logits = logits[0 : logits_shape[0], sequence_lengths]
@@ -1011,7 +1006,6 @@ class TFGPTJForQuestionAnswering(TFGPTJPreTrainedModel, TFQuestionAnsweringLoss)
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         training: Optional[bool] = False,
-        **kwargs,
     ):
         r"""
         start_positions (`np.ndarray` or `tf.Tensor` of shape `(batch_size,)`, *optional*):
